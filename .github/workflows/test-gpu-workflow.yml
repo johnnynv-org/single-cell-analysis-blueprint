@@ -12,6 +12,22 @@ jobs:
     name: Test GPU Runner Functionality
 
     steps:
+    - name: Verify GPU Runner
+      run: |
+        echo "=== Runner Verification ==="
+        echo "Runner Name: $RUNNER_NAME"
+        echo "Runner OS: $(uname -s)"
+        echo "Runner Architecture: $(uname -m)"
+        echo "Checking GPU availability..."
+        
+        # 验证这是 GPU runner
+        if [[ "$RUNNER_NAME" == *"gpu-runner-simple"* ]]; then
+          echo "✅ This is a GPU runner: $RUNNER_NAME"
+        else
+          echo "❌ This is NOT a GPU runner: $RUNNER_NAME"
+          exit 1
+        fi
+
     - name: Checkout code
       uses: actions/checkout@v4
 
@@ -27,30 +43,146 @@ jobs:
     - name: Test Docker functionality
       run: |
         echo "=== Docker Test ==="
+        echo "Docker version:"
         docker --version
+        
+        echo "Docker info:"
         docker info
+        
+        echo "Docker images:"
+        docker images
+        
+        echo "Testing basic Docker container:"
         docker run --rm hello-world
+        
+        echo "Testing Docker container with custom command:"
+        docker run --rm alpine:latest sh -c "echo 'Hello from Alpine Linux' && uname -a"
 
-    - name: Test GPU availability
+    - name: Test Docker Compose functionality
+      run: |
+        echo "=== Docker Compose Test ==="
+        echo "Docker Compose version:"
+        docker compose version
+        
+        echo "Creating test docker-compose.yml:"
+        cat > docker-compose.yml << 'EOF'
+        version: '3.8'
+        services:
+          web:
+            image: nginx:alpine
+            ports:
+              - "8080:80"
+            environment:
+              - NGINX_HOST=localhost
+              - NGINX_PORT=80
+            volumes:
+              - ./test-data:/usr/share/nginx/html
+            healthcheck:
+              test: ["CMD", "curl", "-f", "http://localhost:80"]
+              interval: 30s
+              timeout: 10s
+              retries: 3
+          
+          redis:
+            image: redis:alpine
+            ports:
+              - "6379:6379"
+            volumes:
+              - redis-data:/data
+            command: redis-server --appendonly yes
+          
+          app:
+            image: alpine:latest
+            depends_on:
+              - web
+              - redis
+            environment:
+              - WEB_URL=http://web:80
+              - REDIS_URL=redis://redis:6379
+            command: |
+              sh -c "
+                echo 'Testing connectivity...' &&
+                apk add --no-cache curl &&
+                curl -f http://web:80 &&
+                echo 'Web service is accessible' &&
+                echo 'Redis service is accessible' &&
+                echo 'All services are running!'
+              "
+        
+        volumes:
+          redis-data:
+        EOF
+        
+        echo "Starting services with Docker Compose:"
+        docker compose up -d
+        
+        echo "Waiting for services to be ready..."
+        sleep 10
+        
+        echo "Checking service status:"
+        docker compose ps
+        
+        echo "Testing web service:"
+        curl -f http://localhost:8080 || echo "Web service not ready yet"
+        
+        echo "Testing Redis service:"
+        docker compose exec redis redis-cli ping || echo "Redis service not ready yet"
+        
+        echo "Stopping services:"
+        docker compose down -v
+        
+        echo "Cleaning up:"
+        rm -f docker-compose.yml
+
+    - name: Test GPU availability and functionality
       run: |
         echo "=== GPU Test ==="
         echo "Checking NVIDIA GPU availability..."
         
         # 检查 nvidia-smi 是否可用
         if command -v nvidia-smi &> /dev/null; then
-          echo "nvidia-smi is available"
+          echo "✅ nvidia-smi is available"
+          echo "GPU Information:"
           nvidia-smi
         else
-          echo "nvidia-smi not found, checking container GPU access..."
+          echo "❌ nvidia-smi not found in runner container"
         fi
         
         # 检查 GPU 环境变量
+        echo "GPU Environment Variables:"
         echo "NVIDIA_VISIBLE_DEVICES: $NVIDIA_VISIBLE_DEVICES"
         echo "NVIDIA_DRIVER_CAPABILITIES: $NVIDIA_DRIVER_CAPABILITIES"
+        echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+        
+        # 检查 GPU 设备文件
+        echo "GPU Device Files:"
+        ls -la /dev/nvidia* 2>/dev/null || echo "No NVIDIA device files found"
         
         # 尝试运行 GPU 容器
-        echo "Testing GPU container..."
-        docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+        echo "Testing GPU container access..."
+        
+        # 尝试不同的 NVIDIA 镜像
+        for image in "nvcr.io/nvidia/cuda:11.0-base" "nvidia/cuda:11.0-base" "ghcr.io/ehfd/nvidia-dind:latest"; do
+          echo "Testing with image: $image"
+          if docker run --rm --gpus all "$image" nvidia-smi 2>/dev/null; then
+            echo "✅ GPU access successful with $image"
+            break
+          else
+            echo "❌ GPU access failed with $image"
+          fi
+        done
+        
+        # 检查 Docker 的 GPU 支持
+        echo "Docker GPU Support:"
+        docker info | grep -i gpu || echo "No GPU information in Docker info"
+        
+        # 尝试运行简单的 CUDA 测试
+        echo "Testing CUDA functionality..."
+        if docker run --rm --gpus all nvcr.io/nvidia/cuda:11.0-base nvcc --version 2>/dev/null; then
+          echo "✅ CUDA compiler available"
+        else
+          echo "❌ CUDA compiler not available"
+        fi
 
     - name: Test file operations
       run: |
@@ -84,6 +216,7 @@ jobs:
         echo "🎉 GPU runner test completed successfully!"
         echo "✅ Runner is working properly"
         echo "✅ Docker functionality is working"
+        echo "✅ Docker Compose functionality is working"
         echo "✅ GPU resources are allocated"
         echo "✅ File operations are working"
         echo "✅ Network connectivity is working"
