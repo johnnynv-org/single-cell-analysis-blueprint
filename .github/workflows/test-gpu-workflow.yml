@@ -8,7 +8,8 @@ on:
 
 jobs:
   test-gpu-runner:
-    runs-on: [self-hosted, linux, x64, gpu]  # 使用 GPU 标签
+    runs-on: [self-hosted, linux, x64]
+    # runs-on: [self-hosted, linux, x64, gpu]  # 使用 GPU 标签
     name: Test GPU Runner Functionality
 
     steps:
