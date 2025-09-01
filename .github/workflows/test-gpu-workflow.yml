@@ -4,11 +4,11 @@ on:
   workflow_dispatch:  # 手动触发
   push:
     branches: [ main, johnnynv-patch-dev ]
-    paths: [ '.github/workflows/test-gpu-runner.yml' ]
+    paths: [ '.github/workflows/test-gpu-workflow.yml' ]
 
 jobs:
   test-gpu-runner:
-    runs-on: [self-hosted, linux, x64]  # 使用标签指定我们的 runner
+    runs-on: [self-hosted, linux, x64, gpu]  # 使用标签指定我们的 runner
     name: Test GPU Runner Functionality
 
     steps:
