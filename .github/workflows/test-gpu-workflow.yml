@@ -3,7 +3,7 @@ name: Test GPU DinD Runner - Comprehensive Validation
 "on":
   workflow_dispatch:  # 手动触发
   push:
-    branches: [ main ]
+    branches: [ main, johnnynv-patch-dev ]
     paths: [ '.github/workflows/test-gpu-workflow.yml' ]
 
 jobs:
