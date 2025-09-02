@@ -21,7 +21,7 @@ jobs:
         echo "Checking GPU availability..."
         
         # 验证这是 GPU runner
-        if [[ "$RUNNER_NAME" == *"gpu-runner-simple"* ]]; then
+        if [[ "$RUNNER_NAME" == *"gpu-runner"* ]]; then
           echo "✅ This is a GPU runner: $RUNNER_NAME"
         else
           echo "❌ This is NOT a GPU runner: $RUNNER_NAME"
